@@ -1,7 +1,7 @@
 import { vcaasRequest } from "@/lib/vcaas-server";
 import { normalizeVcaasError, toErrorEnvelope } from "@/lib/vcaas-errors";
 import { NextRequest, NextResponse } from "next/server";
-import { authFailed, claimProject, enforceProjectScope, getOwnedProjectIds, resolveVcaasContext } from "../_shared";
+import { authFailed, claimProject, enforceProjectScope, getOwnedProjectIds, rateLimitResponse, resolveVcaasContext } from "../_shared";
 
 interface VcaasApiResponse {
   /**
@@ -27,6 +27,8 @@ async function handleRequest(
   try {
     const auth = await resolveVcaasContext();
     if (authFailed(auth)) return auth.response;
+    const limited = rateLimitResponse(`${auth.team.userId}:${req.method}`);
+    if (limited) return limited;
     const { path } = await params;
     const outOfScope = await enforceProjectScope(auth.team, req.method, path);
     if (outOfScope) return outOfScope;

@@ -24,6 +24,25 @@ export function authFailed(result: VcaasAuthResult): result is VcaasAuthFailed {
   return result.ok === false;
 }
 
+const requestWindows = new Map<string, { count: number; resetAt: number }>();
+const REQUEST_WINDOW_MS = 60_000;
+const REQUEST_LIMIT = 120;
+
+export function rateLimitResponse(key: string) {
+  const now = Date.now();
+  const current = requestWindows.get(key);
+  if (!current || current.resetAt <= now) {
+    requestWindows.set(key, { count: 1, resetAt: now + REQUEST_WINDOW_MS });
+    return null;
+  }
+  current.count += 1;
+  if (current.count <= REQUEST_LIMIT) return null;
+  return NextResponse.json(
+    { ok: false, error: "Too many requests", code: "RATE_LIMITED", data: null },
+    { status: 429, headers: { "Retry-After": String(Math.ceil((current.resetAt - now) / 1000)) } },
+  );
+}
+
 export async function resolveVcaasContext(): Promise<VcaasAuthResult> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {

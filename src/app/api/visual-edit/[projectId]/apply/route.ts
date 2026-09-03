@@ -5,6 +5,7 @@ import {
     authFailed,
     enforceProjectScope,
     isRoutableProjectSlug,
+    rateLimitResponse,
     resolveVcaasContext,
 } from "../../../vcaas/_shared";
 import { vcaasRequest } from "@/lib/vcaas-server";
@@ -227,9 +228,11 @@ export async function POST(
     { params }: { params: Promise<{ projectId: string }> }
 ) {
     const auth = await resolveVcaasContext();
-    if (authFailed(auth)) return auth.response;
-
-    const { projectId } = await params;
+  if (authFailed(auth)) return auth.response;
+  const limited = rateLimitResponse(`${auth.team.userId}:visual-edit`);
+  if (limited) return limited;
+  
+  const { projectId } = await params;
     if (!isRoutableProjectSlug(projectId)) return fail("PROJECT_NOT_FOUND", 404);
 
     /**
