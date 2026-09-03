@@ -69,8 +69,9 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Every route is public — just attach CORS + CSP headers and continue.
+  // Attach shared transport headers and a correlation id for server logs.
   const response = NextResponse.next();
+  response.headers.set("x-request-id", request.headers.get("x-request-id") || crypto.randomUUID());
   addCorsHeaders(response, request);
   addCspHeaders(response);
   return response;
