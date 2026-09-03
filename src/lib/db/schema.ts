@@ -45,3 +45,11 @@ export const verification = pgTable("verification", {
   createdAt: timestamp("createdAt").defaultNow(),
   updatedAt: timestamp("updatedAt").defaultNow(),
 });
+
+export const projectAccess = pgTable("project_access", {
+  id: text("id").primaryKey(),
+  projectId: text("projectId").notNull(),
+  userId: text("userId").notNull(),
+  role: text("role").notNull().default("owner"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+});

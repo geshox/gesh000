@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { vcaasUploadRequest } from "@/lib/vcaas-server";
+import { authFailed, enforceProjectScope, isRoutableProjectSlug, resolveVcaasContext } from "../../_shared";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  try {
-    const { projectId } = await params;
+  const auth = await resolveVcaasContext();
+  if (authFailed(auth)) return auth.response;
+  const { projectId } = await params;
+  if (!isRoutableProjectSlug(projectId)) return NextResponse.json({ ok: false, error: "Project not found" }, { status: 404 });
+  const outOfScope = await enforceProjectScope(auth.team, "POST", ["projects", projectId]);
+  if (outOfScope) return outOfScope;
 
+  try {
     // Forward the multipart form data straight through to the VCaaS endpoint.
     const formData = await req.formData();
     const response = await vcaasUploadRequest(

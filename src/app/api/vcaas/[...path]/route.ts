@@ -1,6 +1,7 @@
 import { vcaasRequest } from "@/lib/vcaas-server";
 import { normalizeVcaasError, toErrorEnvelope } from "@/lib/vcaas-errors";
 import { NextRequest, NextResponse } from "next/server";
+import { authFailed, claimProject, enforceProjectScope, getOwnedProjectIds, resolveVcaasContext } from "../_shared";
 
 interface VcaasApiResponse {
   /**
@@ -24,7 +25,11 @@ async function handleRequest(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
+    const auth = await resolveVcaasContext();
+    if (authFailed(auth)) return auth.response;
     const { path } = await params;
+    const outOfScope = await enforceProjectScope(auth.team, req.method, path);
+    if (outOfScope) return outOfScope;
     const vcaasPath = "/" + path.join("/");
 
     // Forward query parameters
@@ -64,6 +69,26 @@ async function handleRequest(
     if (json.errors) {
       const normalized = normalizeVcaasError(json.errors, response.status);
       return NextResponse.json(toErrorEnvelope(normalized), { status: normalized.status });
+    }
+
+    const [resource, action] = path;
+    if (resource === "projects" && path.length === 1 && req.method === "GET" && Array.isArray(json.data)) {
+      const owned = await getOwnedProjectIds(auth.team.userId);
+      json.data = json.data.filter((item) => {
+        if (!item || typeof item !== "object" || !("projectId" in item)) return false;
+        return owned.has(String((item as { projectId: string }).projectId));
+      });
+    }
+    const createdProjectId =
+      resource === "projects" && (action === "create" || action === "launch") &&
+      json.data && typeof json.data === "object" && "projectId" in json.data
+        ? String((json.data as { projectId: string }).projectId)
+        : null;
+    if (createdProjectId) await claimProject(createdProjectId, auth.team.userId);
+
+    if (resource === "projects" && action === undefined && req.method === "DELETE") {
+      // Ownership records are intentionally retained until the upstream deletion
+      // succeeds; stale records do not grant access to a deleted project.
     }
 
     return NextResponse.json(
