@@ -46,10 +46,21 @@ function addCspHeaders(response: NextResponse) {
   return response;
 }
 
-// NOTE: Authentication has been removed — the platform is fully open and every
-// route is public. No user account is required. This proxy now only handles
-// CORS and CSP headers (needed for the live preview iframe and custom domains).
+const PUBLIC_PAGE_PATHS = new Set(["/sign-in", "/sign-up"]);
+
+function hasSessionCookie(request: NextRequest) {
+  return request.cookies.has("better-auth.session_token") || request.cookies.has("__Secure-better-auth.session_token");
+}
+
+// The proxy provides an optimistic navigation guard. API handlers must still
+// validate the Better Auth session before reading or mutating user data.
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const isProtectedPage = pathname === "/" || pathname.startsWith("/project/");
+  if (request.method === "GET" && isProtectedPage && !PUBLIC_PAGE_PATHS.has(pathname) && !hasSessionCookie(request)) {
+    return NextResponse.redirect(new URL("/sign-in", request.url));
+  }
+
   // Handle CORS preflight requests
   if (request.method === "OPTIONS") {
     const response = new NextResponse(null, { status: 204 });
