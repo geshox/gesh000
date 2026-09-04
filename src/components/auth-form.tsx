@@ -23,9 +23,10 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     event.preventDefault();
     setPending(true);
     setError("");
+    const normalizedEmail = email.trim().toLowerCase();
     const result = isSignUp
-      ? await authClient.signUp.email({ name, email, password })
-      : await authClient.signIn.email({ email, password });
+      ? await authClient.signUp.email({ name: name.trim(), email: normalizedEmail, password })
+      : await authClient.signIn.email({ email: normalizedEmail, password });
     setPending(false);
     if (result.error) {
       setError("Unable to authenticate with those details. Please try again.");
@@ -43,7 +44,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     setResetPending(true);
     setError("");
     const result = await authClient.requestPasswordReset({
-      email,
+      email: email.trim().toLowerCase(),
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setResetPending(false);
