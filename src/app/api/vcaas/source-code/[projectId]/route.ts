@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { vcaasRequest } from "@/lib/vcaas-server";
+import { authFailed, enforceProjectScope, isRoutableProjectSlug, resolveVcaasContext } from "../../_shared";
 
 // Binary source-code proxy. Fetches the VCaaS source-code signed URL, then
 // downloads the ZIP archive SERVER-SIDE (avoids browser CORS on the storage
@@ -9,7 +10,12 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const auth = await resolveVcaasContext();
+  if (authFailed(auth)) return auth.response;
   const { projectId } = await params;
+  if (!isRoutableProjectSlug(projectId)) return NextResponse.json({ ok: false, error: "Project not found" }, { status: 404 });
+  const outOfScope = await enforceProjectScope(auth.team, "GET", ["projects", projectId]);
+  if (outOfScope) return outOfScope;
 
   try {
     // 1) Ask VCaaS for the signed download URL + metadata.

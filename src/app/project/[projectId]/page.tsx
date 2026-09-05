@@ -34,6 +34,7 @@ import { getPublishedHost, getPreviewUrlField } from "@/lib/project-status";
 import { useVisualEditor } from "@/components/workspace/visual-editor/use-visual-editor";
 import { VisualEditorPanel } from "@/components/workspace/visual-editor/VisualEditorPanel";
 import { VisualChangesBar } from "@/components/workspace/visual-editor/VisualChangesBar";
+import { FlightRecorder, BuildHealthCoach } from "@/components/workspace/P1WorkspaceTools";
 import { t as translate } from "@/i18n";
 
 // Pick the correct development preview URL following the VCaaS docs:
@@ -830,6 +831,16 @@ export default function WorkspacePage() {
             {(serverWake.waking || serverWake.failed) && (
               <div className="px-2 pt-2 sm:px-3">
                 <ServerWakeNotice wake={serverWake} manualRetry={!serverWake.willRetry} />
+              </div>
+            )}
+            {activeTab === "logs" && (
+              <div className="grid gap-3 px-2 pt-2 sm:grid-cols-2 sm:px-3">
+                <FlightRecorder events={operation.kind ? [
+                  { label: "Operation started", detail: operation.kind, status: "active" },
+                  { label: "Workspace synchronized", detail: "The latest project state is available", status: "complete" },
+                  { label: "Preview verification", detail: "Waiting for operation completion", status: "pending" },
+                ] : undefined} />
+                <BuildHealthCoach />
               </div>
             )}
             <div className={`flex-1 overflow-hidden ${activeTab === "preview" ? "rounded-none" : "m-2 sm:m-3 rounded-xl shadow-sm"}`} style={{ background: cardBg }}>
